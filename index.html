@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Trade Relations Interactive Map</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            border: 2px solid #34495e;
+            border-radius: 10px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #87CEEB 0%, #98FB98 100%);
+        }
+
+        .country {
+            fill: #3498db;
+            stroke: #2c3e50;
+            stroke-width: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .country:hover {
+            fill: #e74c3c;
+            stroke: #c0392b;
+            stroke-width: 2px;
+            filter: drop-shadow(0 0 10px rgba(231, 76, 60, 0.6));
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(44, 62, 80, 0.95);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            max-width: 350px;
+            z-index: 1000;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .tooltip h3 {
+            margin: 0 0 10px 0;
+            color: #3498db;
+            font-size: 18px;
+        }
+
+        .tooltip h4 {
+            margin: 10px 0 5px 0;
+            color: #e74c3c;
+            font-size: 14px;
+        }
+
+        .tooltip p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        .tooltip .flag {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .tooltip hr {
+            margin: 10px 0;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .deficit-positive {
+            color: #2ecc71;
+        }
+
+        .deficit-negative {
+            color: #e74c3c;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .zoom-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .zoom-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .legend {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(52, 73, 94, 0.1);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin: 0 15px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 US Trade Relations Interactive Map 2024</h1>
+        
+        <div class="controls">
+            <button class="zoom-btn" onclick="zoomIn()">🔍 Zoom In</button>
+            <button class="zoom-btn" onclick="zoomOut()">🔍 Zoom Out</button>
+            <button class="zoom-btn" onclick="resetZoom()">🏠 Reset View</button>
+        </div>
+
+        <div class="map-container">
+            <svg id="world-map"></svg>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <div class="info-panel">
+            <p><strong>🎯 Hover over any country to see detailed US trade data for 2024!</strong></p>
+            <p>Displays trade deficit/surplus, exports, imports, Trump tariff allegations, and policy responses.</p>
+            <div class="legend">
+                <strong>Trade Balance Legend:</strong>
+                <span class="legend-item">
+                    <span class="legend-color deficit-positive" style="background: #2ecc71;"></span>
+                    Surplus (US exports more)
+                </span>
+                <span class="legend-item">
+                    <span class="legend-color deficit-negative" style="background: #e74c3c;"></span>
+                    Deficit (US imports more)
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Read and process the uploaded Excel data
+        async function loadTradeData() {
+            try {
+                const response = await window.fs.readFile('Trump_Tariff_Data.xlsx');
+                
+                // Import the XLSX library dynamically
+                const XLSX = await import('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+                
+                const workbook = XLSX.read(response);
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const data = XLSX.utils.sheet_to_json(worksheet);
+                
+                return data;
+            } catch (error) {
+                console.error('Error loading trade data:', error);
+                return [];
+            }
+        }
+
+        // Format numbers for display
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
+            const absNum = Math.abs(num);
+            if (absNum >= 1000) {
+                return (num / 1000).toFixed(1) + 'B';
+            } else {
+                return num.toFixed(1) + 'M';
+            }
+        }
+
+        function formatPopulation(pop) {
+            if (pop === null || pop === undefined || pop === '' || isNaN(pop)) return 'N/A';
+            if (pop >= 1000000000) {
+                return (pop / 1000000000).toFixed(2) + ' billion';
+            } else if (pop >= 1000000) {
+                return (pop / 1000000).toFixed(1) + ' million';
+            } else if (pop >= 1000) {
+                return (pop / 1000).toFixed(0) + 'K';
+            }
+            return pop.toString();
+        }
+
+        function formatPercentage(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
+            return (num * 100).toFixed(1) + '%';
+        }
+
+        // Country data with flags and basic info
+        const countryBasicInfo = {
+            'United States': { flag: '🇺🇸', capital: 'Washington D.C.', currency: 'US Dollar' },
+            'China': { flag: '🇨🇳', capital: 'Beijing', currency: 'Chinese Yuan' },
+            'Germany': { flag: '🇩🇪', capital: 'Berlin', currency: 'Euro' },
+            'Japan': { flag: '🇯🇵', capital: 'Tokyo', currency: 'Japanese Yen' },
+            'United Kingdom': { flag: '🇬🇧', capital: 'London', currency: 'British Pound' },
+            'France': { flag: '🇫🇷', capital: 'Paris', currency: 'Euro' },
+            'Canada': { flag: '🇨🇦', capital: 'Ottawa', currency: 'Canadian Dollar' },
+            'Mexico': { flag: '🇲🇽', capital: 'Mexico City', currency: 'Mexican Peso' },
+            'India': { flag: '🇮🇳', capital: 'New Delhi', currency: 'Indian Rupee' },
+            'Brazil': { flag: '🇧🇷', capital: 'Brasília', currency: 'Brazilian Real' },
+            'Russia': { flag: '🇷🇺', capital: 'Moscow', currency: 'Russian Ruble' },
+            'Australia': { flag: '🇦🇺', capital: 'Canberra', currency: 'Australian Dollar' },
+            'South Korea': { flag: '🇰🇷', capital: 'Seoul', currency: 'South Korean Won' },
+            'Italy': { flag: '🇮🇹', capital: 'Rome', currency: 'Euro' },
+            'Spain': { flag: '🇪🇸', capital: 'Madrid', currency: 'Euro' },
+            'Netherlands': { flag: '🇳🇱', capital: 'Amsterdam', currency: 'Euro' },
+            'Taiwan': { flag: '🇹🇼', capital: 'Taipei', currency: 'New Taiwan Dollar' },
+            'Belgium': { flag: '🇧🇪', capital: 'Brussels', currency: 'Euro' },
+            'Switzerland': { flag: '🇨🇭', capital: 'Bern', currency: 'Swiss Franc' },
+            'Thailand': { flag: '🇹🇭', capital: 'Bangkok', currency: 'Thai Baht' },
+            'Ireland': { flag: '🇮🇪', capital: 'Dublin', currency: 'Euro' },
+            'Israel': { flag: '🇮🇱', capital: 'Jerusalem', currency: 'Israeli Shekel' },
+            'Malaysia': { flag: '🇲🇾', capital: 'Kuala Lumpur', currency: 'Malaysian Ringgit' },
+            'Singapore': { flag: '🇸🇬', capital: 'Singapore', currency: 'Singapore Dollar' },
+            'Vietnam': { flag: '🇻🇳', capital: 'Hanoi', currency: 'Vietnamese Dong' },
+            'Indonesia': { flag: '🇮🇩', capital: 'Jakarta', currency: 'Indonesian Rupiah' },
+            'Turkey': { flag: '🇹🇷', capital: 'Ankara', currency: 'Turkish Lira' },
+            'Poland': { flag: '🇵🇱', capital: 'Warsaw', currency: 'Polish Zloty' },
+            'Sweden': { flag: '🇸🇪', capital: 'Stockholm', currency: 'Swedish Krona' },
+            'Norway': { flag: '🇳🇴', capital: 'Oslo', currency: 'Norwegian Krone' },
+            'Denmark': { flag: '🇩🇰', capital: 'Copenhagen', currency: 'Danish Krone' },
+            'Finland': { flag: '🇫🇮', capital: 'Helsinki', currency: 'Euro' },
+            'Philippines': { flag: '🇵🇭', capital: 'Manila', currency: 'Philippine Peso' },
+            'Chile': { flag: '🇨🇱', capital: 'Santiago', currency: 'Chilean Peso' },
+            'South Africa': { flag: '🇿🇦', capital: 'Cape Town', currency: 'South African Rand' },
+            'Egypt': { flag: '🇪🇬', capital: 'Cairo', currency: 'Egyptian Pound' },
+            'Saudi Arabia': { flag: '🇸🇦', capital: 'Riyadh', currency: 'Saudi Riyal' },
+            'Bangladesh': { flag: '🇧🇩', capital: 'Dhaka', currency: 'Bangladeshi Taka' },
+            'Colombia': { flag: '🇨🇴', capital: 'Bogotá', currency: 'Colombian Peso' },
+            'Argentina': { flag: '🇦🇷', capital: 'Buenos Aires', currency: 'Argentine Peso' },
+            'United Arab Emirates': { flag: '🇦🇪', capital: 'Abu Dhabi', currency: 'UAE Dirham' },
+            'Peru': { flag: '🇵🇪', capital: 'Lima', currency: 'Peruvian Sol' },
+            'Ukraine': { flag: '🇺🇦', capital: 'Kyiv', currency: 'Ukrainian Hryvnia' },
+            'Czech Republic': { flag: '🇨🇿', capital: 'Prague', currency: 'Czech Koruna' },
+            'Hungary': { flag: '🇭🇺', capital: 'Budapest', currency: 'Hungarian Forint' },
+            'Romania': { flag: '🇷🇴', capital: 'Bucharest', currency: 'Romanian Leu' },
+            'New Zealand': { flag: '🇳🇿', capital: 'Wellington', currency: 'New Zealand Dollar' },
+            'Morocco': { flag: '🇲🇦', capital: 'Rabat', currency: 'Moroccan Dirham' },
+            'Algeria': { flag: '🇩🇿', capital: 'Algiers', currency: 'Algerian Dinar' },
+            'Nigeria': { flag: '🇳🇬', capital: 'Abuja', currency: 'Nigerian Naira' },
+            'Angola': { flag: '🇦🇴', capital: 'Luanda', currency: 'Angolan Kwanza' },
+            'Kenya': { flag: '🇰🇪', capital: 'Nairobi', currency: 'Kenyan Shilling' },
+            'Ethiopia': { flag: '🇪🇹', capital: 'Addis Ababa', currency: 'Ethiopian Birr' },
+            'Ghana': { flag: '🇬🇭', capital: 'Accra', currency: 'Ghanaian Cedi' },
+            'Pakistan': { flag: '🇵🇰', capital: 'Islamabad', currency: 'Pakistani Rupee' }
+        };
+
+        // Global variable to store trade data
+        let tradeDataMap = {};
+
+        // Set up SVG
+        const svg = d3.select('#world-map');
+        const container = d3.select('.map-container');
+        const tooltip = d3.select('#tooltip');
+
+        // Get container dimensions
+        const containerRect = container.node().getBoundingClientRect();
+        const width = containerRect.width;
+        const height = containerRect.height;
+
+        svg.attr('width', width).attr('height', height);
+
+        // Create map projection
+        const projection = d3.geoNaturalEarth1()
+            .scale(150)
+            .translate([width / 2, height / 2]);
+
+        const path = d3.geoPath().projection(projection);
+
+        // Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.5, 8])
+            .on('zoom', handleZoom);
+
+        svg.call(zoom);
+
+        const g = svg.append('g');
+
+        function handleZoom(event) {
+            g.attr('transform', event.transform);
+        }
+
+        // Initialize the map
+        async function initializeMap() {
+            // Load trade data first
+            const tradeData = await loadTradeData();
+            
+            // Process trade data into a map
+            tradeData.forEach(row => {
+                if (row.Country) {
+                    tradeDataMap[row.Country] = {
+                        deficit2024: row['US 2024 Deficit'],
+                        exports2024: row['US 2024 Exports'],
+                        imports2024: row['US 2024 Imports (Customs Basis)'],
+                        trumpTariffs: row['Trump Tariffs Alleged'],
+                        trumpResponse: row['Trump Response'],
+                        population: row['Population']
+                    };
+                }
+            });
+
+            console.log('Trade data loaded for', Object.keys(tradeDataMap).length, 'countries');
+
+            // Load world map data
+            const worldMapUrl = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
+
+            try {
+                const world = await d3.json(worldMapUrl);
+                
+                // Draw countries
+                g.selectAll('path')
+                    .data(world.features)
+                    .enter()
+                    .append('path')
+                    .attr('d', path)
+                    .attr('class', 'country')
+                    .attr('data-name', d => d.properties.NAME)
+                    .on('mouseover', handleMouseOver)
+                    .on('mousemove', handleMouseMove)
+                    .on('mouseout', handleMouseOut)
+                    .on('click', handleClick);
+
+            } catch (error) {
+                console.log('Error loading map data, creating fallback visualization');
+                createFallbackMap();
+            }
+        }
+
+        function createFallbackMap() {
+            // Create a simplified world map if the external data fails to load
+            const fallbackCountries = [
+                {name: 'United States', x: 200, y: 200, width: 150, height: 80},
+                {name: 'Canada', x: 180, y: 120, width: 200, height: 60},
+                {name: 'Brazil', x: 350, y: 350, width: 120, height: 100},
+                {name: 'Russia', x: 600, y: 100, width: 200, height: 120},
+                {name: 'China', x: 700, y: 200, width: 130, height: 100},
+                {name: 'India', x: 650, y: 280, width: 80, height: 80},
+                {name: 'Australia', x: 750, y: 400, width: 120, height: 80},
+                {name: 'Germany', x: 500, y: 180, width: 40, height: 40},
+                {name: 'France', x: 470, y: 190, width: 35, height: 40},
+                {name: 'United Kingdom', x: 450, y: 160, width: 30, height: 35},
+                {name: 'Japan', x: 850, y: 220, width: 50, height: 60},
+                {name: 'Mexico', x: 150, y: 280, width: 80, height: 60},
+                {name: 'Egypt', x: 520, y: 280, width: 40, height: 40},
+                {name: 'South Africa', x: 530, y: 420, width: 50, height: 50}
+            ];
+
+            g.selectAll('rect')
+                .data(fallbackCountries)
+                .enter()
+                .append('rect')
+                .attr('x', d => d.x)
+                .attr('y', d => d.y)
+                .attr('width', d => d.width)
+                .attr('height', d => d.height)
+                .attr('class', 'country')
+                .attr('data-name', d => d.name)
+                .attr('rx', 5)
+                .on('mouseover', handleMouseOver)
+                .on('mousemove', handleMouseMove)
+                .on('mouseout', handleMouseOut)
+                .on('click', handleClick);
+
+            // Add country labels
+            g.selectAll('text')
+                .data(fallbackCountries)
+                .enter()
+                .append('text')
+                .attr('x', d => d.x + d.width/2)
+                .attr('y', d => d.y + d.height/2)
+                .attr('text-anchor', 'middle')
+                .attr('alignment-baseline', 'middle')
+                .attr('fill', 'white')
+                .attr('font-size', '12px')
+                .attr('font-weight', 'bold')
+                .attr('pointer-events', 'none')
+                .text(d => d.name);
+        }
+
+        function handleMouseOver(event, d) {
+            const countryName = d?.properties?.NAME || d?.name || event.target.getAttribute('data-name');
+            const basicInfo = countryBasicInfo[countryName];
+            const tradeData = tradeDataMap[countryName];
+            
+            if (basicInfo && tradeData) {
+                const deficit = tradeData.deficit2024;
+                const deficitClass = deficit < 0 ? 'deficit-negative' : 'deficit-positive';
+                const deficitText = deficit < 0 ? 'Trade Deficit' : 'Trade Surplus';
+                
+                tooltip.html(`
+                    <h3><span class="flag">${basicInfo.flag}</span>${countryName}</h3>
+                    <p><strong>Capital:</strong> ${basicInfo.capital}</p>
+                    <p><strong>Currency:</strong> ${basicInfo.currency}</p>
+                    <p><strong>Population:</strong> ${formatPopulation(tradeData.population)}</p>
+                    <hr>
+                    <h4>📊 US Trade Data 2024</h4>
+                    <p><strong class="${deficitClass}">${deficitText}:</strong> ${formatNumber(Math.abs(deficit))}</p>
+                    <p><strong>US Exports:</strong> ${formatNumber(tradeData.exports2024)}</p>
+                    <p><strong>US Imports:</strong> ${formatNumber(tradeData.imports2024)}</p>
+                    <p><strong>Trump Tariffs Alleged:</strong> ${formatPercentage(tradeData.trumpTariffs)}</p>
+                    <p><strong>Trump Response:</strong> ${formatPercentage(tradeData.trumpResponse)}</p>
+                `);
+            } else if (tradeData) {
+                const deficit = tradeData.deficit2024;
+                const deficitClass = deficit < 0 ? 'deficit-negative' : 'deficit-positive';
+                const deficitText = deficit < 0 ? 'Trade Deficit' : 'Trade Surplus';
+                
+                tooltip.html(`
+                    <h3>🌍 ${countryName}</h3>
+                    <p><strong>Population:</strong> ${formatPopulation(tradeData.population)}</p>
+                    <hr>
+                    <h4>📊 US Trade Data 2024</h4>
+                    <p><strong class="${deficitClass}">${deficitText}:</strong> ${formatNumber(Math.abs(deficit))}</p>
+                    <p><strong>US Exports:</strong> ${formatNumber(tradeData.exports2024)}</p>
+                    <p><strong>US Imports:</strong> ${formatNumber(tradeData.imports2024)}</p>
+                    <p><strong>Trump Tariffs Alleged:</strong> ${formatPercentage(tradeData.trumpTariffs)}</p>
+                    <p><strong>Trump Response:</strong> ${formatPercentage(tradeData.trumpResponse)}</p>
+                `);
+            } else {
+                tooltip.html(`
+                    <h3>🌍 ${countryName}</h3>
+                    <p>No US trade data available for this country</p>
+                    <p><em>Click to explore this country!</em></p>
+                `);
+            }
+            
+            tooltip.classed('show', true);
+        }
+
+        function handleMouseMove(event) {
+            const containerRect = container.node().getBoundingClientRect();
+            const mouseX = event.clientX - containerRect.left;
+            const mouseY = event.clientY - containerRect.top;
+            
+            tooltip
+                .style('left', (mouseX + 15) + 'px')
+                .style('top', (mouseY - 15) + 'px');
+        }
+
+        function handleMouseOut() {
+            tooltip.classed('show', false);
+        }
+
+        function handleClick(event, d) {
+            const countryName = d?.properties?.NAME || d?.name || event.target.getAttribute('data-name');
+            const tradeData = tradeDataMap[countryName];
+            
+            if (tradeData) {
+                const deficit = tradeData.deficit2024;
+                const balanceType = deficit < 0 ? 'deficit' : 'surplus';
+                const balanceAmount = formatNumber(Math.abs(deficit));
+                
+                alert(`🎯 ${countryName} Trade Summary\n\n` +
+                      `• Trade ${balanceType}: ${balanceAmount}\n` +
+                      `• US Exports: ${formatNumber(tradeData.exports2024)}\n` +
+                      `• US Imports: ${formatNumber(tradeData.imports2024)}\n` +
+                      `• Trump Tariffs: ${formatPercentage(tradeData.trumpTariffs)}\n` +
+                      `• Policy Response: ${formatPercentage(tradeData.trumpResponse)}\n\n` +
+                      `💡 In a full application, this could show:\n` +
+                      `• Historical trade trends\n` +
+                      `• Detailed tariff breakdown\n` +
+                      `• Trade policy analysis`);
+            } else {
+                alert(`You clicked on ${countryName}! 🎉\n\nNo trade data available for this country.`);
+            }
+        }
+
+        // Zoom control functions
+        function zoomIn() {
+            svg.transition().duration(300).call(
+                zoom.scaleBy, 1.5
+            );
+        }
+
+        function zoomOut() {
+            svg.transition().duration(300).call(
+                zoom.scaleBy, 1 / 1.5
+            );
+        }
+
+        function resetZoom() {
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const newContainerRect = container.node().getBoundingClientRect();
+            const newWidth = newContainerRect.width;
+            const newHeight = newContainerRect.height;
+            
+            svg.attr('width', newWidth).attr('height', newHeight);
+            
+            projection
+                .scale(150)
+                .translate([newWidth / 2, newHeight / 2]);
+                
+            g.selectAll('path').attr('d', path);
+        });
+
+        // Initialize the map when the page loads
+        initializeMap();
+    </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 30px;
+  font-size: 2.5em;
+  font-weight: 300;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2em;
+  color: #2c3e50;
+}
+.error {
+  color: #e74c3c;
+  background: #fbe9e7;
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+}
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: auto; /* Let SVG viewBox handle aspect ratio */
+  border: 2px solid #34495e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.country {
+  stroke: #2c3e50;
+  stroke-width: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.country-no-data { fill: #bdc3c7; }
+.country-surplus { fill: #27ae60; }
+.country-deficit { fill: #e74c3c; }
+.country-low-trade { fill: #3498db; }
+
+.country:hover {
+  stroke: #2c3e50;
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.6));
+  opacity: 0.9;
+}
+
+.tooltip {
+  position: absolute;
+  background: rgba(44, 62, 80, 0.98);
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+  max-width: 320px;
+  z-index: 1000;
+}
+
+.tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tooltip h3 {
+  margin: 0 0 10px 0;
+  color: #3498db;
+  font-size: 18px;
+  border-bottom: 1px solid #3498db;
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.tooltip h4 {
+  margin: 12px 0 8px 0;
+  color: #e67e22;
+  font-size: 15px;
+}
+
+.tooltip p { margin: 5px 0; }
+.tooltip .flag { font-size: 24px; margin-right: 10px; }
+.deficit-positive { color: #2ecc71; font-weight: bold; }
+.deficit-negative { color: #e74c3c; font-weight: bold; }
+.trade-value { font-weight: bold; color: #f39c12; }
+.tariff-high { color: #e74c3c; font-weight: bold; }
+.tariff-medium { color: #f39c12; font-weight: bold; }
+.tariff-low { color: #27ae60; font-weight: bold; }
+
+.info-panel {
+  margin-top: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  color: #2c3e50;
+}
+
+.legend {
+  margin-top: 15px;
+  padding: 15px;
+  background: rgba(52, 73, 94, 0.05);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  font-size: 13px;
+}
+
+.legend-section { display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-color { width: 20px; height: 15px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.2); }
+.legend-section p { margin: 2px 0; font-size: 12px; }
+
+
+.stats-panel {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: rgba(46, 204, 113, 0.05);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  text-align: center;
+}
+
+.stat-item {
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.stat-value { font-size: 26px; font-weight: bold; color: #2c3e50; }
+.stat-label { font-size: 12px; color: #7f8c8d; margin-top: 5px; text-transform: uppercase; }

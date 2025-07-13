@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>US Trade Relations Interactive Map</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -15,7 +16,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
@@ -32,10 +33,27 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
 
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #7f8c8d;
+        }
+
+        .error {
+            text-align: center;
+            padding: 30px;
+            background: #ffebee;
+            border: 1px solid #f44336;
+            border-radius: 8px;
+            color: #c62828;
+            margin: 20px 0;
+        }
+
         .map-container {
             position: relative;
             width: 100%;
-            height: 600px;
+            height: 700px;
             border: 2px solid #34495e;
             border-radius: 10px;
             overflow: hidden;
@@ -43,36 +61,52 @@
         }
 
         .country {
-            fill: #3498db;
             stroke: #2c3e50;
             stroke-width: 0.5px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+        }
+
+        .country-no-data {
+            fill: #bdc3c7;
+        }
+
+        .country-surplus {
+            fill: #27ae60;
+        }
+
+        .country-deficit {
+            fill: #e74c3c;
+        }
+
+        .country-low-trade {
+            fill: #3498db;
         }
 
         .country:hover {
-            fill: #e74c3c;
-            stroke: #c0392b;
-            stroke-width: 2px;
-            filter: drop-shadow(0 0 10px rgba(231, 76, 60, 0.6));
+            stroke: #2c3e50;
+            stroke-width: 3px;
+            filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.7));
+            opacity: 0.9;
         }
 
         .tooltip {
             position: absolute;
-            background: rgba(44, 62, 80, 0.95);
+            background: rgba(44, 62, 80, 0.98);
             color: white;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 12px;
             font-size: 14px;
             pointer-events: none;
             opacity: 0;
             transform: translateY(-10px);
             transition: all 0.3s ease;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.2);
-            max-width: 350px;
+            max-width: 380px;
             z-index: 1000;
+            line-height: 1.5;
         }
 
         .tooltip.show {
@@ -81,91 +115,183 @@
         }
 
         .tooltip h3 {
-            margin: 0 0 10px 0;
+            margin: 0 0 12px 0;
             color: #3498db;
-            font-size: 18px;
+            font-size: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
         }
 
         .tooltip h4 {
-            margin: 10px 0 5px 0;
-            color: #e74c3c;
-            font-size: 14px;
+            margin: 15px 0 8px 0;
+            color: #e67e22;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
         }
 
         .tooltip p {
-            margin: 5px 0;
+            margin: 6px 0;
             line-height: 1.4;
         }
 
         .tooltip .flag {
-            font-size: 24px;
-            margin-right: 10px;
-        }
-
-        .tooltip hr {
-            margin: 10px 0;
-            border: 1px solid rgba(255,255,255,0.3);
+            font-size: 28px;
+            margin-right: 12px;
         }
 
         .deficit-positive {
             color: #2ecc71;
+            font-weight: bold;
         }
 
         .deficit-negative {
             color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .trade-value {
+            font-weight: bold;
+            color: #f39c12;
+        }
+
+        .tariff-high {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .tariff-medium {
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        .tariff-low {
+            color: #27ae60;
+            font-weight: bold;
         }
 
         .info-panel {
-            margin-top: 20px;
-            padding: 20px;
+            margin-top: 25px;
+            padding: 25px;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            border-radius: 10px;
-            text-align: center;
+            border-radius: 12px;
             color: #2c3e50;
         }
 
         .controls {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             text-align: center;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        .zoom-btn {
+        .control-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .zoom-btn, .filter-btn {
             background: #3498db;
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin: 0 5px;
+            padding: 12px 20px;
             border-radius: 25px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
             transition: all 0.3s ease;
+            min-width: 120px;
         }
 
-        .zoom-btn:hover {
+        .zoom-btn:hover, .filter-btn:hover {
             background: #2980b9;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+            box-shadow: 0 8px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .filter-btn.active {
+            background: #e74c3c;
         }
 
         .legend {
-            margin-top: 15px;
-            padding: 15px;
+            margin-top: 20px;
+            padding: 20px;
             background: rgba(52, 73, 94, 0.1);
-            border-radius: 8px;
-            font-size: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .legend-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .legend-item {
-            display: inline-block;
-            margin: 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .legend-color {
-            display: inline-block;
-            width: 15px;
+            width: 20px;
             height: 15px;
-            margin-right: 5px;
-            vertical-align: middle;
+            border-radius: 3px;
+            border: 1px solid #34495e;
+        }
+
+        .stats-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(46, 204, 113, 0.1);
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            text-align: center;
+        }
+
+        .stat-item {
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .file-input-container {
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 20px;
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .file-input {
+            margin: 10px;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -173,83 +299,108 @@
     <div class="container">
         <h1>🌍 US Trade Relations Interactive Map 2024</h1>
         
-        <div class="controls">
-            <button class="zoom-btn" onclick="zoomIn()">🔍 Zoom In</button>
-            <button class="zoom-btn" onclick="zoomOut()">🔍 Zoom Out</button>
-            <button class="zoom-btn" onclick="resetZoom()">🏠 Reset View</button>
+        <div class="file-input-container">
+            <p><strong>📁 Load Trade Data:</strong></p>
+            <input type="file" id="excelFile" accept=".xlsx,.xls" class="file-input">
+            <p style="font-size: 12px; color: #7f8c8d; margin-top: 10px;">
+                Select your Trump_Tariff_Data.xlsx file to load trade data
+            </p>
         </div>
 
-        <div class="map-container">
+        <div id="loading" class="loading" style="display: none;">
+            <p>🔄 Loading trade data and map...</p>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="controls" class="controls" style="display: none;">
+            <div class="control-group">
+                <button class="zoom-btn" onclick="zoomIn()">🔍 Zoom In</button>
+                <button class="zoom-btn" onclick="zoomOut()">🔍 Zoom Out</button>
+                <button class="zoom-btn" onclick="resetZoom()">🏠 Reset View</button>
+            </div>
+            <div class="control-group">
+                <button class="filter-btn active" onclick="showAll()">🌍 Show All</button>
+                <button class="filter-btn" onclick="showDeficits()">📉 Deficits Only</button>
+                <button class="filter-btn" onclick="showSurplus()">📈 Surplus Only</button>
+                <button class="filter-btn" onclick="showHighTariffs()">🚫 High Tariffs</button>
+            </div>
+        </div>
+
+        <div class="map-container" id="mapContainer" style="display: none;">
             <svg id="world-map"></svg>
             <div class="tooltip" id="tooltip"></div>
         </div>
 
-        <div class="info-panel">
-            <p><strong>🎯 Hover over any country to see detailed US trade data for 2024!</strong></p>
-            <p>Displays trade deficit/surplus, exports, imports, Trump tariff allegations, and policy responses.</p>
-            <div class="legend">
-                <strong>Trade Balance Legend:</strong>
-                <span class="legend-item">
-                    <span class="legend-color deficit-positive" style="background: #2ecc71;"></span>
-                    Surplus (US exports more)
-                </span>
-                <span class="legend-item">
-                    <span class="legend-color deficit-negative" style="background: #e74c3c;"></span>
-                    Deficit (US imports more)
-                </span>
+        <div id="infoPanel" class="info-panel" style="display: none;">
+            <div class="stats-panel" id="statsPanel">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalCountries">-</div>
+                    <div class="stat-label">Countries with Data</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="deficitCountries">-</div>
+                    <div class="stat-label">Trade Deficits</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="surplusCountries">-</div>
+                    <div class="stat-label">Trade Surplus</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalDeficit">-</div>
+                    <div class="stat-label">Total Trade Deficit</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="highTariffCountries">-</div>
+                    <div class="stat-label">High Tariff Risk</div>
+                </div>
             </div>
+
+            <div class="legend">
+                <div class="legend-section">
+                    <strong>🎨 Trade Balance Colors:</strong>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #27ae60;"></div>
+                        <span>Trade Surplus (US exports more)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e74c3c;"></div>
+                        <span>Trade Deficit (US imports more)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3498db;"></div>
+                        <span>Low Trade Volume</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #bdc3c7;"></div>
+                        <span>No Trade Data</span>
+                    </div>
+                </div>
+                <div class="legend-section">
+                    <strong>📊 Data Sources:</strong>
+                    <p style="font-size: 12px; margin: 5px 0;">• US 2024 Trade Deficit/Surplus</p>
+                    <p style="font-size: 12px; margin: 5px 0;">• US 2024 Exports & Imports</p>
+                    <p style="font-size: 12px; margin: 5px 0;">• Trump Tariffs Alleged (%)</p>
+                    <p style="font-size: 12px; margin: 5px 0;">• Trump Policy Response (%)</p>
+                    <p style="font-size: 12px; margin: 5px 0;">• Country Population Data</p>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: 15px;">
+                <strong>🎯 Hover over any country to see detailed US trade data!</strong><br>
+                Click countries for detailed analysis. Use filters to focus on specific trade relationships.
+            </p>
         </div>
     </div>
 
     <script>
-        // Read and process the uploaded Excel data
-        async function loadTradeData() {
-            try {
-                const response = await window.fs.readFile('Trump_Tariff_Data.xlsx');
-                
-                // Import the XLSX library dynamically
-                const XLSX = await import('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
-                
-                const workbook = XLSX.read(response);
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const data = XLSX.utils.sheet_to_json(worksheet);
-                
-                return data;
-            } catch (error) {
-                console.error('Error loading trade data:', error);
-                return [];
-            }
-        }
+        // Global variables
+        let tradeDataMap = {};
+        let worldData = null;
+        let svg, g, projection, path, zoom, tooltip;
+        let currentFilter = 'all';
 
-        // Format numbers for display
-        function formatNumber(num) {
-            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
-            const absNum = Math.abs(num);
-            if (absNum >= 1000) {
-                return (num / 1000).toFixed(1) + 'B';
-            } else {
-                return num.toFixed(1) + 'M';
-            }
-        }
-
-        function formatPopulation(pop) {
-            if (pop === null || pop === undefined || pop === '' || isNaN(pop)) return 'N/A';
-            if (pop >= 1000000000) {
-                return (pop / 1000000000).toFixed(2) + ' billion';
-            } else if (pop >= 1000000) {
-                return (pop / 1000000).toFixed(1) + ' million';
-            } else if (pop >= 1000) {
-                return (pop / 1000).toFixed(0) + 'K';
-            }
-            return pop.toString();
-        }
-
-        function formatPercentage(num) {
-            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
-            return (num * 100).toFixed(1) + '%';
-        }
-
-        // Country data with flags and basic info
+        // Country basic information with flags
         const countryBasicInfo = {
             'United States': { flag: '🇺🇸', capital: 'Washington D.C.', currency: 'US Dollar' },
             'China': { flag: '🇨🇳', capital: 'Beijing', currency: 'Chinese Yuan' },
@@ -308,189 +459,235 @@
             'Pakistan': { flag: '🇵🇰', capital: 'Islamabad', currency: 'Pakistani Rupee' }
         };
 
-        // Global variable to store trade data
-        let tradeDataMap = {};
-
-        // Set up SVG
-        const svg = d3.select('#world-map');
-        const container = d3.select('.map-container');
-        const tooltip = d3.select('#tooltip');
-
-        // Get container dimensions
-        const containerRect = container.node().getBoundingClientRect();
-        const width = containerRect.width;
-        const height = containerRect.height;
-
-        svg.attr('width', width).attr('height', height);
-
-        // Create map projection
-        const projection = d3.geoNaturalEarth1()
-            .scale(150)
-            .translate([width / 2, height / 2]);
-
-        const path = d3.geoPath().projection(projection);
-
-        // Zoom behavior
-        const zoom = d3.zoom()
-            .scaleExtent([0.5, 8])
-            .on('zoom', handleZoom);
-
-        svg.call(zoom);
-
-        const g = svg.append('g');
-
-        function handleZoom(event) {
-            g.attr('transform', event.transform);
-        }
-
-        // Initialize the map
-        async function initializeMap() {
-            // Load trade data first
-            const tradeData = await loadTradeData();
-            
-            // Process trade data into a map
-            tradeData.forEach(row => {
-                if (row.Country) {
-                    tradeDataMap[row.Country] = {
-                        deficit2024: row['US 2024 Deficit'],
-                        exports2024: row['US 2024 Exports'],
-                        imports2024: row['US 2024 Imports (Customs Basis)'],
-                        trumpTariffs: row['Trump Tariffs Alleged'],
-                        trumpResponse: row['Trump Response'],
-                        population: row['Population']
-                    };
-                }
-            });
-
-            console.log('Trade data loaded for', Object.keys(tradeDataMap).length, 'countries');
-
-            // Load world map data
-            const worldMapUrl = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
-
-            try {
-                const world = await d3.json(worldMapUrl);
-                
-                // Draw countries
-                g.selectAll('path')
-                    .data(world.features)
-                    .enter()
-                    .append('path')
-                    .attr('d', path)
-                    .attr('class', 'country')
-                    .attr('data-name', d => d.properties.NAME)
-                    .on('mouseover', handleMouseOver)
-                    .on('mousemove', handleMouseMove)
-                    .on('mouseout', handleMouseOut)
-                    .on('click', handleClick);
-
-            } catch (error) {
-                console.log('Error loading map data, creating fallback visualization');
-                createFallbackMap();
+        // Utility functions
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
+            const absNum = Math.abs(num);
+            if (absNum >= 1000) {
+                return (num / 1000).toFixed(1) + 'B';
+            } else if (absNum >= 1) {
+                return num.toFixed(1) + 'M';
+            } else {
+                return (num * 1000).toFixed(0) + 'K';
             }
         }
 
-        function createFallbackMap() {
-            // Create a simplified world map if the external data fails to load
-            const fallbackCountries = [
-                {name: 'United States', x: 200, y: 200, width: 150, height: 80},
-                {name: 'Canada', x: 180, y: 120, width: 200, height: 60},
-                {name: 'Brazil', x: 350, y: 350, width: 120, height: 100},
-                {name: 'Russia', x: 600, y: 100, width: 200, height: 120},
-                {name: 'China', x: 700, y: 200, width: 130, height: 100},
-                {name: 'India', x: 650, y: 280, width: 80, height: 80},
-                {name: 'Australia', x: 750, y: 400, width: 120, height: 80},
-                {name: 'Germany', x: 500, y: 180, width: 40, height: 40},
-                {name: 'France', x: 470, y: 190, width: 35, height: 40},
-                {name: 'United Kingdom', x: 450, y: 160, width: 30, height: 35},
-                {name: 'Japan', x: 850, y: 220, width: 50, height: 60},
-                {name: 'Mexico', x: 150, y: 280, width: 80, height: 60},
-                {name: 'Egypt', x: 520, y: 280, width: 40, height: 40},
-                {name: 'South Africa', x: 530, y: 420, width: 50, height: 50}
-            ];
+        function formatPopulation(pop) {
+            if (pop === null || pop === undefined || pop === '' || isNaN(pop)) return 'N/A';
+            if (pop >= 1000000000) {
+                return (pop / 1000000000).toFixed(2) + ' billion';
+            } else if (pop >= 1000000) {
+                return (pop / 1000000).toFixed(1) + ' million';
+            } else if (pop >= 1000) {
+                return (pop / 1000).toFixed(0) + 'K';
+            }
+            return pop.toString();
+        }
 
-            g.selectAll('rect')
-                .data(fallbackCountries)
+        function formatPercentage(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return 'N/A';
+            return (num * 100).toFixed(1) + '%';
+        }
+
+        function getTariffClass(tariff) {
+            if (tariff >= 0.5) return 'tariff-high';
+            if (tariff >= 0.2) return 'tariff-medium';
+            return 'tariff-low';
+        }
+
+        function getCountryClass(countryName) {
+            const data = tradeDataMap[countryName];
+            if (!data) return 'country-no-data';
+            
+            const deficit = data.deficit2024;
+            const totalTrade = Math.abs(data.exports2024 || 0) + Math.abs(data.imports2024 || 0);
+            
+            if (totalTrade < 100) return 'country-low-trade'; // Less than $100M total trade
+            if (deficit < 0) return 'country-deficit';
+            if (deficit > 0) return 'country-surplus';
+            return 'country-low-trade';
+        }
+
+        // File processing function
+        function processExcelFile(file) {
+            showLoading(true);
+            hideError();
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    console.log('Excel data loaded:', jsonData.length, 'countries');
+                    
+                    // Process trade data
+                    tradeDataMap = {};
+                    jsonData.forEach(row => {
+                        if (row.Country) {
+                            tradeDataMap[row.Country] = {
+                                deficit2024: parseFloat(row['US 2024 Deficit']) || 0,
+                                exports2024: parseFloat(row['US 2024 Exports']) || 0,
+                                imports2024: parseFloat(row['US 2024 Imports (Customs Basis)']) || 0,
+                                trumpTariffs: parseFloat(row['Trump Tariffs Alleged']) || 0,
+                                trumpResponse: parseFloat(row['Trump Response']) || 0,
+                                population: parseInt(row['Population']) || 0
+                            };
+                        }
+                    });
+                    
+                    console.log('Trade data processed for', Object.keys(tradeDataMap).length, 'countries');
+                    updateStats();
+                    loadMapData();
+                    
+                } catch (error) {
+                    console.error('Error processing Excel file:', error);
+                    showError('Error processing Excel file: ' + error.message + '. Please ensure you have the correct Trump_Tariff_Data.xlsx file.');
+                    showLoading(false);
+                }
+            };
+            
+            reader.onerror = function() {
+                showError('Error reading file. Please try again.');
+                showLoading(false);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Map loading and rendering
+        function loadMapData() {
+            const worldMapUrl = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
+            
+            d3.json(worldMapUrl).then(function(world) {
+                worldData = world;
+                console.log('World map data loaded');
+                initializeMap();
+                renderMap();
+                showLoading(false);
+                showMapInterface(true);
+            }).catch(function(error) {
+                console.error('Error loading world map:', error);
+                showError('Error loading world map data. Please check your internet connection.');
+                showLoading(false);
+            });
+        }
+
+        function initializeMap() {
+            const container = d3.select('#mapContainer');
+            const containerRect = container.node().getBoundingClientRect();
+            const width = containerRect.width;
+            const height = containerRect.height;
+
+            svg = d3.select('#world-map');
+            tooltip = d3.select('#tooltip');
+
+            svg.attr('width', width).attr('height', height);
+
+            projection = d3.geoNaturalEarth1()
+                .scale(150)
+                .translate([width / 2, height / 2]);
+
+            path = d3.geoPath().projection(projection);
+
+            zoom = d3.zoom()
+                .scaleExtent([0.5, 8])
+                .on('zoom', handleZoom);
+
+            svg.call(zoom);
+            g = svg.append('g');
+        }
+
+        function renderMap() {
+            g.selectAll('path').remove(); // Clear existing paths
+            
+            g.selectAll('path')
+                .data(worldData.features)
                 .enter()
-                .append('rect')
-                .attr('x', d => d.x)
-                .attr('y', d => d.y)
-                .attr('width', d => d.width)
-                .attr('height', d => d.height)
-                .attr('class', 'country')
-                .attr('data-name', d => d.name)
-                .attr('rx', 5)
+                .append('path')
+                .attr('d', path)
+                .attr('class', d => {
+                    const countryName = d.properties.NAME;
+                    const baseClass = 'country';
+                    const colorClass = getCountryClass(countryName);
+                    return `${baseClass} ${colorClass}`;
+                })
+                .attr('data-name', d => d.properties.NAME)
+                .style('display', d => {
+                    const countryName = d.properties.NAME;
+                    return shouldShowCountry(countryName) ? 'block' : 'none';
+                })
                 .on('mouseover', handleMouseOver)
                 .on('mousemove', handleMouseMove)
                 .on('mouseout', handleMouseOut)
                 .on('click', handleClick);
-
-            // Add country labels
-            g.selectAll('text')
-                .data(fallbackCountries)
-                .enter()
-                .append('text')
-                .attr('x', d => d.x + d.width/2)
-                .attr('y', d => d.y + d.height/2)
-                .attr('text-anchor', 'middle')
-                .attr('alignment-baseline', 'middle')
-                .attr('fill', 'white')
-                .attr('font-size', '12px')
-                .attr('font-weight', 'bold')
-                .attr('pointer-events', 'none')
-                .text(d => d.name);
         }
 
+        function shouldShowCountry(countryName) {
+            const data = tradeDataMap[countryName];
+            if (!data && currentFilter !== 'all') return false;
+            
+            switch(currentFilter) {
+                case 'deficits':
+                    return data && data.deficit2024 < 0;
+                case 'surplus':
+                    return data && data.deficit2024 > 0;
+                case 'tariffs':
+                    return data && data.trumpTariffs >= 0.3; // 30% or higher
+                default:
+                    return true;
+            }
+        }
+
+        // Event handlers
         function handleMouseOver(event, d) {
-            const countryName = d?.properties?.NAME || d?.name || event.target.getAttribute('data-name');
+            const countryName = d.properties.NAME;
             const basicInfo = countryBasicInfo[countryName];
             const tradeData = tradeDataMap[countryName];
             
-            if (basicInfo && tradeData) {
-                const deficit = tradeData.deficit2024;
-                const deficitClass = deficit < 0 ? 'deficit-negative' : 'deficit-positive';
-                const deficitText = deficit < 0 ? 'Trade Deficit' : 'Trade Surplus';
-                
-                tooltip.html(`
-                    <h3><span class="flag">${basicInfo.flag}</span>${countryName}</h3>
+            let tooltipContent = `<h3>`;
+            if (basicInfo) {
+                tooltipContent += `<span class="flag">${basicInfo.flag}</span>`;
+            }
+            tooltipContent += `${countryName}</h3>`;
+            
+            if (basicInfo) {
+                tooltipContent += `
                     <p><strong>Capital:</strong> ${basicInfo.capital}</p>
                     <p><strong>Currency:</strong> ${basicInfo.currency}</p>
-                    <p><strong>Population:</strong> ${formatPopulation(tradeData.population)}</p>
-                    <hr>
-                    <h4>📊 US Trade Data 2024</h4>
-                    <p><strong class="${deficitClass}">${deficitText}:</strong> ${formatNumber(Math.abs(deficit))}</p>
-                    <p><strong>US Exports:</strong> ${formatNumber(tradeData.exports2024)}</p>
-                    <p><strong>US Imports:</strong> ${formatNumber(tradeData.imports2024)}</p>
-                    <p><strong>Trump Tariffs Alleged:</strong> ${formatPercentage(tradeData.trumpTariffs)}</p>
-                    <p><strong>Trump Response:</strong> ${formatPercentage(tradeData.trumpResponse)}</p>
-                `);
-            } else if (tradeData) {
+                `;
+            }
+            
+            if (tradeData) {
                 const deficit = tradeData.deficit2024;
                 const deficitClass = deficit < 0 ? 'deficit-negative' : 'deficit-positive';
                 const deficitText = deficit < 0 ? 'Trade Deficit' : 'Trade Surplus';
+                const tariffClass = getTariffClass(tradeData.trumpTariffs);
                 
-                tooltip.html(`
-                    <h3>🌍 ${countryName}</h3>
+                tooltipContent += `
                     <p><strong>Population:</strong> ${formatPopulation(tradeData.population)}</p>
-                    <hr>
                     <h4>📊 US Trade Data 2024</h4>
-                    <p><strong class="${deficitClass}">${deficitText}:</strong> ${formatNumber(Math.abs(deficit))}</p>
-                    <p><strong>US Exports:</strong> ${formatNumber(tradeData.exports2024)}</p>
-                    <p><strong>US Imports:</strong> ${formatNumber(tradeData.imports2024)}</p>
-                    <p><strong>Trump Tariffs Alleged:</strong> ${formatPercentage(tradeData.trumpTariffs)}</p>
-                    <p><strong>Trump Response:</strong> ${formatPercentage(tradeData.trumpResponse)}</p>
-                `);
+                    <p><strong class="${deficitClass}">${deficitText}:</strong> <span class="trade-value">$${formatNumber(Math.abs(deficit))}</span></p>
+                    <p><strong>US Exports:</strong> <span class="trade-value">$${formatNumber(tradeData.exports2024)}</span></p>
+                    <p><strong>US Imports:</strong> <span class="trade-value">$${formatNumber(tradeData.imports2024)}</span></p>
+                    <p><strong>Trump Tariffs:</strong> <span class="${tariffClass}">${formatPercentage(tradeData.trumpTariffs)}</span></p>
+                    <p><strong>Policy Response:</strong> <span class="${tariffClass}">${formatPercentage(tradeData.trumpResponse)}</span></p>
+                `;
             } else {
-                tooltip.html(`
-                    <h3>🌍 ${countryName}</h3>
-                    <p>No US trade data available for this country</p>
-                    <p><em>Click to explore this country!</em></p>
-                `);
+                tooltipContent += `
+                    <p style="color: #95a5a6;"><em>No US trade data available</em></p>
+                    <p style="color: #95a5a6;">Click to explore this country!</p>
+                `;
             }
             
+            tooltip.html(tooltipContent);
             tooltip.classed('show', true);
         }
 
         function handleMouseMove(event) {
+            const container = d3.select('#mapContainer');
             const containerRect = container.node().getBoundingClientRect();
             const mouseX = event.clientX - containerRect.left;
             const mouseY = event.clientY - containerRect.top;
@@ -505,66 +702,184 @@
         }
 
         function handleClick(event, d) {
-            const countryName = d?.properties?.NAME || d?.name || event.target.getAttribute('data-name');
+            const countryName = d.properties.NAME;
             const tradeData = tradeDataMap[countryName];
             
             if (tradeData) {
                 const deficit = tradeData.deficit2024;
                 const balanceType = deficit < 0 ? 'deficit' : 'surplus';
                 const balanceAmount = formatNumber(Math.abs(deficit));
+                const totalTrade = tradeData.exports2024 + tradeData.imports2024;
+                const tariffRisk = tradeData.trumpTariffs >= 0.3 ? 'HIGH RISK' : tradeData.trumpTariffs >= 0.1 ? 'MEDIUM RISK' : 'LOW RISK';
                 
-                alert(`🎯 ${countryName} Trade Summary\n\n` +
+                alert(`🎯 ${countryName} - Comprehensive Trade Analysis\n\n` +
+                      `💰 TRADE BALANCE:\n` +
                       `• Trade ${balanceType}: ${balanceAmount}\n` +
+                      `• Total trade volume: ${formatNumber(totalTrade)}\n\n` +
+                      `📈 TRADE FLOWS:\n` +
                       `• US Exports: ${formatNumber(tradeData.exports2024)}\n` +
-                      `• US Imports: ${formatNumber(tradeData.imports2024)}\n` +
+                      `• US Imports: ${formatNumber(tradeData.imports2024)}\n\n` +
+                      `🚫 TARIFF ANALYSIS:\n` +
                       `• Trump Tariffs: ${formatPercentage(tradeData.trumpTariffs)}\n` +
-                      `• Policy Response: ${formatPercentage(tradeData.trumpResponse)}\n\n` +
+                      `• Policy Response: ${formatPercentage(tradeData.trumpResponse)}\n` +
+                      `• Risk Level: ${tariffRisk}\n\n` +
+                      `👥 DEMOGRAPHICS:\n` +
+                      `• Population: ${formatPopulation(tradeData.population)}\n\n` +
+                      `🔍 STRATEGIC INSIGHTS:\n` +
+                      `• Trade dependency: ${((totalTrade / 1000) * 100).toFixed(2)}% of trillion-dollar trade\n` +
+                      `• Economic relationship: ${deficit < -50000 ? 'Critical deficit partner' : deficit > 10000 ? 'Strong surplus partner' : 'Balanced trade relationship'}\n\n` +
                       `💡 In a full application, this could show:\n` +
-                      `• Historical trade trends\n` +
-                      `• Detailed tariff breakdown\n` +
-                      `• Trade policy analysis`);
+                      `• 10-year trade trend analysis\n` +
+                      `• Sector-by-sector breakdown\n` +
+                      `• Supply chain vulnerability assessment\n` +
+                      `• Economic impact projections`);
             } else {
-                alert(`You clicked on ${countryName}! 🎉\n\nNo trade data available for this country.`);
+                alert(`🌍 ${countryName}\n\n` +
+                      `No comprehensive US trade data available for this country.\n\n` +
+                      `This could indicate:\n` +
+                      `• Minimal trade relationship\n` +
+                      `• Data not tracked in 2024\n` +
+                      `• Emerging market opportunity\n\n` +
+                      `💡 Consider exploring:\n` +
+                      `• Regional trade agreements\n` +
+                      `• Investment opportunities\n` +
+                      `• Cultural exchange programs`);
             }
         }
 
-        // Zoom control functions
+        function handleZoom(event) {
+            g.attr('transform', event.transform);
+        }
+
+        // Control functions
         function zoomIn() {
-            svg.transition().duration(300).call(
-                zoom.scaleBy, 1.5
-            );
+            svg.transition().duration(300).call(zoom.scaleBy, 1.5);
         }
 
         function zoomOut() {
-            svg.transition().duration(300).call(
-                zoom.scaleBy, 1 / 1.5
-            );
+            svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
         }
 
         function resetZoom() {
-            svg.transition().duration(500).call(
-                zoom.transform,
-                d3.zoomIdentity
-            );
+            svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
         }
 
-        // Handle window resize
-        window.addEventListener('resize', function() {
-            const newContainerRect = container.node().getBoundingClientRect();
-            const newWidth = newContainerRect.width;
-            const newHeight = newContainerRect.height;
+        // Filter functions
+        function showAll() {
+            currentFilter = 'all';
+            updateFilterButtons();
+            renderMap();
+        }
+
+        function showDeficits() {
+            currentFilter = 'deficits';
+            updateFilterButtons();
+            renderMap();
+        }
+
+        function showSurplus() {
+            currentFilter = 'surplus';
+            updateFilterButtons();
+            renderMap();
+        }
+
+        function showHighTariffs() {
+            currentFilter = 'tariffs';
+            updateFilterButtons();
+            renderMap();
+        }
+
+        function updateFilterButtons() {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            
+            switch(currentFilter) {
+                case 'all':
+                    document.querySelector('.filter-btn:nth-child(1)').classList.add('active');
+                    break;
+                case 'deficits':
+                    document.querySelector('.filter-btn:nth-child(2)').classList.add('active');
+                    break;
+                case 'surplus':
+                    document.querySelector('.filter-btn:nth-child(3)').classList.add('active');
+                    break;
+                case 'tariffs':
+                    document.querySelector('.filter-btn:nth-child(4)').classList.add('active');
+                    break;
+            }
+        }
+
+        // Statistics and UI functions
+        function updateStats() {
+            const countries = Object.keys(tradeDataMap);
+            const deficitCountries = countries.filter(c => tradeDataMap[c].deficit2024 < 0);
+            const surplusCountries = countries.filter(c => tradeDataMap[c].deficit2024 > 0);
+            const highTariffCountries = countries.filter(c => tradeDataMap[c].trumpTariffs >= 0.3);
+            
+            const totalDeficit = countries.reduce((sum, c) => {
+                const deficit = tradeDataMap[c].deficit2024;
+                return sum + (deficit < 0 ? deficit : 0);
+            }, 0);
+
+            document.getElementById('totalCountries').textContent = countries.length;
+            document.getElementById('deficitCountries').textContent = deficitCountries.length;
+            document.getElementById('surplusCountries').textContent = surplusCountries.length;
+            document.getElementById('totalDeficit').textContent = ' + formatNumber(Math.abs(totalDeficit));
+            document.getElementById('highTariffCountries').textContent = highTariffCountries.length;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function showMapInterface(show) {
+            const elements = ['controls', 'mapContainer', 'infoPanel'];
+            elements.forEach(id => {
+                document.getElementById(id).style.display = show ? 'block' : 'none';
+            });
+        }
+
+        // Window resize handler
+        function handleResize() {
+            if (!svg || !projection || !worldData) return;
+            
+            const container = d3.select('#mapContainer');
+            const containerRect = container.node().getBoundingClientRect();
+            const newWidth = containerRect.width;
+            const newHeight = containerRect.height;
             
             svg.attr('width', newWidth).attr('height', newHeight);
-            
-            projection
-                .scale(150)
-                .translate([newWidth / 2, newHeight / 2]);
-                
+            projection.scale(150).translate([newWidth / 2, newHeight / 2]);
             g.selectAll('path').attr('d', path);
+        }
+
+        // Event listeners
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('File selected:', file.name);
+                processExcelFile(file);
+            }
         });
 
-        // Initialize the map when the page loads
-        initializeMap();
+        window.addEventListener('resize', handleResize);
+
+        // Initialize
+        console.log('US Trade Relations Map initialized. Please select your Excel file to begin.');
+        
+        // Auto-load if Trump_Tariff_Data.xlsx is available (for local testing)
+        if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+            console.log('Running locally - please select the Excel file manually');
+        }
     </script>
 </body>
 </html>
